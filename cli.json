@@ -1,0 +1,40 @@
+{
+  "toggles": {
+    "music": {
+      "youtube_music": {
+        "enable": true,
+        "match": [{ "class": "chrome-cinhimbnkkaeohfgghhklpknlkffjgod-Default" }],
+        "command": ["google-chrome", "--app-id=cinhimbnkkaeohfgghhklpknlkffjgod"],
+        "move": true
+      }
+    },
+    "communication": {
+      "whatsapp": {
+        "enable": true,
+        "match": [{ "class": "chrome-hnpfjngllnobngcgfapefoaidbinmjnm-Default" }],
+        "command": ["google-chrome", "--app-id=hnpfjngllnobngcgfapefoaidbinmjnm"],
+        "move": true
+      },
+      "instagram": {
+        "enable": true,
+        "match": [{ "class": "chrome-akpamiohjfcnimfljfndmaldlcfphjmp-Default" }],
+        "command": ["google-chrome", "--app-id=akpamiohjfcnimfljfndmaldlcfphjmp"],
+        "move": true
+      },
+      "discord": {
+        "enable": true,
+        "match": [{ "class": "discord" }],
+        "command": ["discord"],
+        "move": true
+      }
+    },
+    "todo": {
+      "google_tasks": {
+        "enable": true,
+        "match": [{ "class": "chrome-okhfeehhillipaleckndoboggdkcebmo-Default" }],
+        "command": ["google-chrome", "--app-id=okhfeehhillipaleckndoboggdkcebmo"],
+        "move": true
+      }
+    }
+  }
+}
