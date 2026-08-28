@@ -1,12 +1,12 @@
 echo "Restoring personal config from Git..."
 
-# Clone your personal config repo using the SSH link
-git clone git@github.com:HelpMehh/my-caelestia-config.git /tmp/my-config
+# 1. Clone your personal config repo to a temporary folder
+git clone https://github.com/HelpMehh/my-caelestia-config.git /tmp/my-config
 
-# Copy your custom files directly into the active Caelestia directory
+# 2. Copy your custom files directly into the active Caelestia directory
 cp -a /tmp/my-config/. "$HOME/.config/caelestia/"
 
-# Clean up
+# 3. Clean up
 rm -rf /tmp/my-config
 
 echo "Personal config restored successfully!"
