@@ -1,6 +1,11 @@
 hl.on("hyprland.start", function()
+	-- Chain commands with '&&' to enforce strict execution order:
+	-- 1. Force DBus to recognize the Wayland display
+	-- 2. Import variables to systemd (for Sunshine/etc.)
+	-- 3. Start the graphical target
+	-- 4. ONLY THEN, launch the Caelestia shell
 	hl.exec_cmd(
-		"systemctl --user import-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP && systemctl --user start hyprland-session.target"
+		"dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP && systemctl --user import-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP && systemctl --user start hyprland-session.target && fish -c 'cd ~/.config/quickshell/caelestia; and env LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libfftw3.so.3 caelestia shell -d'"
 	)
 end)
 
