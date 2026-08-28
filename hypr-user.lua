@@ -1,9 +1,3 @@
-hl.on("hyprland.start", function()
-	hl.exec_cmd(
-		"dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP && systemctl --user import-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP && systemctl --user start hyprland-session.target"
-	)
-end)
-
 hl.monitor({
 	output = "DP-2",
 	mode = "2560x1440@240",
