@@ -1,0 +1,10 @@
+{
+    "appearance": {
+        "transparency": {
+            "enabled": true
+        }
+    },
+    "services": {
+        "useTwelveHourClock": false
+    }
+}
