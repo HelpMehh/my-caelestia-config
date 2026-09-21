@@ -23,6 +23,11 @@ hl.monitor({
 	scale = "1",
 })
 
+hl.device({
+	name = "libvirtualhid-keyboard",
+	repeat_delay = 1000,
+})
+
 hl.workspace_rule({ workspace = "1", monitor = "DP-2" })
 hl.workspace_rule({ workspace = "2", monitor = "HDMI-A-2" })
 hl.workspace_rule({ workspace = "3", monitor = "HDMI-A-1" })
