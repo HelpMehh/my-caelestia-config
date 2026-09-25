@@ -12,4 +12,5 @@ thunar --daemon &
 
 cd ~/.config/quickshell/caelestia || exit 1
 env LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libfftw3.so.3 caelestia shell -d
+caelestia wallpaper -r
 qs -c caelestia ipc call lock lock
