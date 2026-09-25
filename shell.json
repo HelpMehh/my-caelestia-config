@@ -9,5 +9,8 @@
     },
     "paths": {
         "sessionGif": "~/.config/caelestia/assets/session.gif"
+    },
+    "lock": {
+        "useWallpaper": true
     }
 }
