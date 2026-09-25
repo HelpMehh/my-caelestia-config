@@ -6,5 +6,8 @@
     },
     "services": {
         "useTwelveHourClock": false
+    },
+    "paths": {
+        "sessionGif": "~/.config/caelestia/assets/session.gif"
     }
 }
