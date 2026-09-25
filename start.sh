@@ -13,4 +13,6 @@ thunar --daemon &
 cd ~/.config/quickshell/caelestia || exit 1
 env LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libfftw3.so.3 caelestia shell -d
 qs -c caelestia ipc call lock lock
+sleep 1
+while [ "$(qs -c caelestia ipc call lock isLocked)" = "true" ]; do sleep 1; done
 caelestia wallpaper -r
