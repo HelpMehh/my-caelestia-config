@@ -37,7 +37,7 @@ LOCK_VIDEO_AUDIO="${LOCK_VIDEO_AUDIO:-once}"
 # the video show through; 1 is Caelestia's normal look. Only the backgrounds
 # fade, not the text. Try another value without a full run:
 #   LOCK_PANEL_OPACITY=0.5 ./hypr-setup.sh patch_caelestia_qml
-LOCK_PANEL_OPACITY="${LOCK_PANEL_OPACITY:-0.1}"
+LOCK_PANEL_OPACITY="${LOCK_PANEL_OPACITY:-0.2}"
 
 SKIP_HYPRBUNTU="${SKIP_HYPRBUNTU:-0}"
 SKIP_CAELESTIA="${SKIP_CAELESTIA:-0}"
