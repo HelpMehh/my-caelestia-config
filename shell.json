@@ -4,13 +4,14 @@
             "enabled": true
         }
     },
-    "services": {
-        "useTwelveHourClock": false
+    "lock": {
+        "useWallpaper": true
     },
     "paths": {
         "sessionGif": "~/.config/caelestia/assets/session.gif"
     },
-    "lock": {
-        "useWallpaper": true
+    "services": {
+        "clockFormat": "TwentyFourHour",
+        "useTwelveHourClock": false
     }
 }
