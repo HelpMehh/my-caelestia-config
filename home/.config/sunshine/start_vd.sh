@@ -14,6 +14,14 @@ else
     WIDTH=$SUNSHINE_CLIENT_WIDTH; HEIGHT=$SUNSHINE_CLIENT_HEIGHT; FPS=${SUNSHINE_CLIENT_FPS:-60}
 fi
 
+# These come from the streaming client and end up in Lua that Hyprland runs,
+# so accept plain numbers only.
+for v in "$WIDTH" "$HEIGHT" "$FPS"; do
+    case "$v" in
+        ''|*[!0-9]*) echo "start_vd.sh: bad client mode '${WIDTH}x${HEIGHT}@${FPS}'" >&2; exit 1 ;;
+    esac
+done
+
 STATE="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/sunshine_vd.lua"
 
 cat > "$STATE" <<EOF

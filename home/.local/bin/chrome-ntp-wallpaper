@@ -1,5 +1,41 @@
 #!/bin/sh
-# Copy the new Caelestia wallpaper into Chrome's new tab background.
-dest="$HOME/.config/google-chrome/Default/background.jpg"
-[ -f "$dest" ] || exit 0
-ffmpeg -loglevel error -y -i "$WALLPAPER_PATH" -q:v 2 "$dest.tmp.jpg" && mv "$dest.tmp.jpg" "$dest"
+# Run by Caelestia after every wallpaper change (cli.json: wallpaper.postHook).
+#
+# Syncs Chrome with the new wallpaper, in this order:
+#   1. copy the wallpaper into Chrome's new tab background
+#   2. write Chrome's theme colour policy (what Caelestia's enableChromium does)
+#   3. tell a running Chrome to reload its policy, which also redraws the new
+#      tab page -- now with the new background already in place.
+#
+# Caelestia's own Chrome theming (enableChromium) must be OFF: it refreshes
+# Chrome *before* this hook runs, so Chrome redraws with the previous image
+# and the new tab background ends up one wallpaper behind.
+
+bg="$HOME/.config/google-chrome/Default/background.jpg"
+policy="/etc/opt/chrome/policies/managed/caelestia.json"
+
+# 1. New tab background (only once a custom background has been set in Chrome).
+if [ -f "$bg" ] && [ -n "$WALLPAPER_PATH" ]; then
+    ffmpeg -loglevel error -y -i "$WALLPAPER_PATH" -q:v 2 "$bg.tmp.jpg" \
+        && mv "$bg.tmp.jpg" "$bg"
+fi
+
+# 2. Theme colour: same policy Caelestia writes, from the scheme's surface colour.
+#    Needs the sudoers rule in /etc/sudoers.d/caelestia-chrome. The colour must
+#    be exactly 6 hex digits: it goes into a root-owned policy file, so nothing
+#    else may ride along into that JSON.
+surface=$(printf '%s' "$SCHEME_COLOURS" \
+    | python3 -c 'import json, sys; print(json.load(sys.stdin)["surface"])' 2>/dev/null)
+if printf '%s' "$surface" | grep -Eqx '[0-9A-Fa-f]{6}'; then
+    printf '{"BrowserThemeColor": "#%s", "BrowserColorScheme": "device"}' "$surface" \
+        | sudo -n tee "$policy" >/dev/null 2>&1
+fi
+
+# 3. Only nudge Chrome if it's already running. Launching it here would start it
+#    in the background (and have it ask for the keyring); a Chrome started later
+#    reads the new policy and background by itself.
+if pgrep -x chrome >/dev/null 2>&1; then
+    google-chrome-stable --refresh-platform-policy --no-startup-window >/dev/null 2>&1
+fi
+
+exit 0
