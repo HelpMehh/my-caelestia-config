@@ -1,0 +1,5 @@
+#!/bin/sh
+# Copy the new Caelestia wallpaper into Chrome's new tab background.
+dest="$HOME/.config/google-chrome/Default/background.jpg"
+[ -f "$dest" ] || exit 0
+ffmpeg -loglevel error -y -i "$WALLPAPER_PATH" -q:v 2 "$dest.tmp.jpg" && mv "$dest.tmp.jpg" "$dest"
