@@ -40,12 +40,12 @@ LOCK_VIDEO="${LOCK_VIDEO:-$HOME/Wallpaper/lockscreen.mp4}"
 LOCK_VIDEO_SCREENS="${LOCK_VIDEO_SCREENS:-DP-2 sunshine_vd}"
 # Audio: "once" plays it on the first pass and loops silently after, so an idle
 # lock doesn't repeat it for hours; "always" plays it every loop; "off" mutes it.
-LOCK_VIDEO_AUDIO="${LOCK_VIDEO_AUDIO:-once}"
+LOCK_VIDEO_AUDIO="${LOCK_VIDEO_AUDIO:-always}"
 # How opaque the lock screen's panel and its cards are, 0-1. Lower lets more of
 # the video show through; 1 is Caelestia's normal look. Only the backgrounds
 # fade, not the text. Try another value without a full run:
 #   LOCK_PANEL_OPACITY=0.5 ./hypr-setup.sh patch_caelestia_qml
-LOCK_PANEL_OPACITY="${LOCK_PANEL_OPACITY:-0.7}"
+LOCK_PANEL_OPACITY="${LOCK_PANEL_OPACITY:-0.2}"
 
 # Where each source-built component comes from, and which version gets built:
 # HEAD (newest code), latest-tag (newest release), a tag, a branch or a commit.
@@ -99,10 +99,13 @@ BUILD_DIR=""
 SUDO_KEEPALIVE_PID=""
 SHELL_STOPPED=0
 
-log()   { printf '\n\033[1;34m==>\033[0m %s\n' "$*"; }
-info()  { printf '    %s\n' "$*"; }
-warn()  { printf '\033[1;33m[warn]\033[0m %s\n' "$*" >&2; }
-die()   { printf '\033[1;31m[fail]\033[0m %s\n' "$*" >&2; exit 1; }
+log() { printf '\n\033[1;34m==>\033[0m %s\n' "$*"; }
+info() { printf '    %s\n' "$*"; }
+warn() { printf '\033[1;33m[warn]\033[0m %s\n' "$*" >&2; }
+die() {
+    printf '\033[1;31m[fail]\033[0m %s\n' "$*" >&2
+    exit 1
+}
 
 on_error() {
     local line=$1
@@ -150,9 +153,9 @@ preflight() {
     # (hyprbuntu from GitLab, sources from GitHub, units and wrappers inline),
     # so these two are the only prerequisites. Install them on a fresh system.
     local missing=()
-    command -v git  >/dev/null || missing+=(git)
+    command -v git >/dev/null || missing+=(git)
     command -v curl >/dev/null || missing+=(curl)
-    if (( ${#missing[@]} )); then
+    if ((${#missing[@]})); then
         info "Installing prerequisites: ${missing[*]}"
         sudo apt-get update
         sudo apt-get install -y "${missing[@]}" ca-certificates
@@ -260,8 +263,8 @@ run_hyprbuntu() {
     # chmod +x and execute.
     curl -fsSL --proto '=https' --tlsv1.2 \
         -o "$script" \
-        "https://gitlab.com/kralos/hyprbuntu/-/raw/main/setup-hyprbuntu.sh" \
-        || die "Could not download setup-hyprbuntu.sh"
+        "https://gitlab.com/kralos/hyprbuntu/-/raw/main/setup-hyprbuntu.sh" ||
+        die "Could not download setup-hyprbuntu.sh"
 
     [[ -s "$script" ]] || die "Downloaded setup-hyprbuntu.sh is empty."
 
@@ -311,18 +314,21 @@ state_set() {
     mkdir -p "$STATE_DIR"
     local tmp
     tmp=$(mktemp "$STATE_DIR/.versions.XXXXXX")
-    { grep -v "^$1=" "$STATE_FILE" 2>/dev/null || true; printf '%s=%s\n' "$1" "$2"; } > "$tmp"
+    {
+        grep -v "^$1=" "$STATE_FILE" 2>/dev/null || true
+        printf '%s=%s\n' "$1" "$2"
+    } >"$tmp"
     mv "$tmp" "$STATE_FILE"
 }
 
 # Newest release tag of a git repo, by version number (a leading "v" is
 # ignored, pre-releases are skipped). Empty if there are none.
 latest_tag() {
-    git ls-remote --tags --refs "$1" 2>/dev/null \
-        | sed 's|.*refs/tags/||' \
-        | grep -viE '(alpha|beta|rc|pre|dev)' \
-        | awk '{ v = $0; sub(/^[vV]/, "", v); print v "\t" $0 }' \
-        | sort -t "$(printf '\t')" -k1,1V | tail -n 1 | cut -f2 || true
+    git ls-remote --tags --refs "$1" 2>/dev/null |
+        sed 's|.*refs/tags/||' |
+        grep -viE '(alpha|beta|rc|pre|dev)' |
+        awk '{ v = $0; sub(/^[vV]/, "", v); print v "\t" $0 }' |
+        sort -t "$(printf '\t')" -k1,1V | tail -n 1 | cut -f2 || true
 }
 
 # resolve_ref URL REF -> the commit REF points at. REF is HEAD, latest-tag,
@@ -331,7 +337,10 @@ resolve_ref() {
     local url=$1 ref=$2 out
     if [[ "$ref" == latest-tag ]]; then ref=$(latest_tag "$url"); fi
     [[ -n "$ref" ]] || return 1
-    if [[ "$ref" =~ ^[0-9a-f]{40}$ ]]; then printf '%s\n' "$ref"; return 0; fi
+    if [[ "$ref" =~ ^[0-9a-f]{40}$ ]]; then
+        printf '%s\n' "$ref"
+        return 0
+    fi
     out=$(git ls-remote "$url" "$ref" 2>/dev/null) || return 1
     # An annotated tag lists the tag object and, with ^{}, its commit.
     printf '%s\n' "$out" | awk -v ref="$ref" '
@@ -359,7 +368,7 @@ short() { if [[ -n "${1:-}" ]]; then printf '%.7s' "$1"; else printf 'unknown'; 
 # anything, so a failed build never leaves a half-updated setup.
 # ---------------------------------------------------------------------------
 
-build_quickshell() {  # SRC COMMIT
+build_quickshell() { # SRC COMMIT
     log "Building Quickshell $(short "$2")"
     cmake -S "$1" -B "$1/build" -G Ninja \
         -DCMAKE_BUILD_TYPE=Release \
@@ -368,24 +377,24 @@ build_quickshell() {  # SRC COMMIT
     cmake --build "$1/build"
 }
 
-install_quickshell() {  # SRC COMMIT
+install_quickshell() { # SRC COMMIT
     sudo cmake --install "$1/build"
     state_set quickshell "$2"
 }
 
-build_libcava() {  # SRC
+build_libcava() { # SRC
     log "Building libcava"
     meson setup "$1/build" "$1" --prefix=/usr --buildtype=release -Dbuild_target=lib
     meson compile -C "$1/build"
 }
 
-install_libcava() {  # SRC COMMIT
+install_libcava() { # SRC COMMIT
     sudo meson install -C "$1/build"
     sudo ldconfig
     state_set libcava "$2"
 }
 
-build_caelestia_plugin() {  # SRC COMMIT
+build_caelestia_plugin() { # SRC COMMIT
     log "Building Caelestia shell plugin $(short "$2")"
     # A shallow checkout has no tags for the build's `git describe`.
     local version
@@ -399,18 +408,18 @@ build_caelestia_plugin() {  # SRC COMMIT
     cmake --build "$1/build"
 }
 
-install_caelestia_plugin() {  # SRC
+install_caelestia_plugin() { # SRC
     sudo cmake --install "$1/build"
 }
 
 # The shell's QML runs from ~/.config/quickshell/caelestia, a git checkout the
 # patches in patch_caelestia_qml() are applied to. It has to be at the same
 # commit as the plugin, or the two halves of the shell don't match.
-sync_shell_qml() {  # COMMIT
+sync_shell_qml() { # COMMIT
     local dir="$HOME/.config/quickshell/caelestia"
     if [[ -d "$dir/.git" ]]; then
-        git -C "$dir" cat-file -e "$1^{commit}" 2>/dev/null \
-            || git -C "$dir" fetch -q --depth 1 "$CAELESTIA_SHELL_URL" "$1"
+        git -C "$dir" cat-file -e "$1^{commit}" 2>/dev/null ||
+            git -C "$dir" fetch -q --depth 1 "$CAELESTIA_SHELL_URL" "$1"
         git -C "$dir" checkout -q -- .
         git -C "$dir" reset -q --hard "$1"
     else
@@ -428,7 +437,7 @@ sync_shell_qml() {  # COMMIT
 # Built into a wheel first, so a failed build never leaves a half-installed
 # CLI. Installed system-wide (/usr/local/bin) so Hyprland keybinds find it
 # without depending on the user's PATH.
-build_caelestia_cli() {  # SRC
+build_caelestia_cli() { # SRC
     log "Building Caelestia CLI"
     local version
     version=$(latest_tag "$CAELESTIA_CLI_URL")
@@ -437,7 +446,7 @@ build_caelestia_cli() {  # SRC
         python3 -m pip wheel --quiet --no-deps --wheel-dir "$1/dist" "$1"
 }
 
-install_caelestia_cli() {  # SRC COMMIT
+install_caelestia_cli() { # SRC COMMIT
     local wheel
     wheel=$(find "$1/dist" -name 'caelestia-*.whl' | head -n 1)
     [[ -n "$wheel" ]] || die "Caelestia CLI wheel not found in $1/dist"
@@ -455,14 +464,14 @@ build_caelestia_ecosystem() {
     info "Build directory: $BUILD_DIR (removed on exit)"
 
     local qs_c cava_c shell_c cli_c
-    qs_c=$(resolve_ref "$QUICKSHELL_URL" "$QUICKSHELL_REF") \
-        || die "Can't resolve Quickshell $QUICKSHELL_REF"
-    cava_c=$(resolve_ref "$LIBCAVA_URL" "$LIBCAVA_REF") \
-        || die "Can't resolve libcava $LIBCAVA_REF"
-    shell_c=$(resolve_ref "$CAELESTIA_SHELL_URL" "$CAELESTIA_SHELL_REF") \
-        || die "Can't resolve Caelestia shell $CAELESTIA_SHELL_REF"
-    cli_c=$(resolve_ref "$CAELESTIA_CLI_URL" "$CAELESTIA_CLI_REF") \
-        || die "Can't resolve Caelestia CLI $CAELESTIA_CLI_REF"
+    qs_c=$(resolve_ref "$QUICKSHELL_URL" "$QUICKSHELL_REF") ||
+        die "Can't resolve Quickshell $QUICKSHELL_REF"
+    cava_c=$(resolve_ref "$LIBCAVA_URL" "$LIBCAVA_REF") ||
+        die "Can't resolve libcava $LIBCAVA_REF"
+    shell_c=$(resolve_ref "$CAELESTIA_SHELL_URL" "$CAELESTIA_SHELL_REF") ||
+        die "Can't resolve Caelestia shell $CAELESTIA_SHELL_REF"
+    cli_c=$(resolve_ref "$CAELESTIA_CLI_URL" "$CAELESTIA_CLI_REF") ||
+        die "Can't resolve Caelestia CLI $CAELESTIA_CLI_REF"
 
     fetch_at "$QUICKSHELL_URL" "$qs_c" "$BUILD_DIR/quickshell"
     build_quickshell "$BUILD_DIR/quickshell" "$qs_c"
@@ -510,8 +519,8 @@ build_caelestia_ecosystem() {
     # in restore_personal_config(). Written unconditionally so a fresh machine
     # has valid Lua even if the repo restore is skipped.
     mkdir -p "$HOME/.config/caelestia"
-    [[ -f "$HOME/.config/caelestia/hypr-vars.lua" ]] || echo "return {}" > "$HOME/.config/caelestia/hypr-vars.lua"
-    [[ -f "$HOME/.config/caelestia/hypr-user.lua" ]] || echo ""            > "$HOME/.config/caelestia/hypr-user.lua"
+    [[ -f "$HOME/.config/caelestia/hypr-vars.lua" ]] || echo "return {}" >"$HOME/.config/caelestia/hypr-vars.lua"
+    [[ -f "$HOME/.config/caelestia/hypr-user.lua" ]] || echo "" >"$HOME/.config/caelestia/hypr-user.lua"
 
     caelestia install || warn "caelestia install returned non-zero; continuing."
 
@@ -557,7 +566,7 @@ build_gpu_screen_recorder() {
     local dir
     dir=$(mktemp -d)
     git clone -q --depth 1 "$GSR_URL" "$dir/gsr"
-    ( cd "$dir/gsr" && sudo ./install.sh )
+    (cd "$dir/gsr" && sudo ./install.sh)
     state_set gsr "$(git -C "$dir/gsr" rev-parse HEAD)"
     rm -rf "$dir"
 }
@@ -580,8 +589,8 @@ patch_caelestia_qml() {
         local commit
         commit=$(state_get caelestia-shell)
         if [[ -z "$commit" ]]; then
-            commit=$(resolve_ref "$CAELESTIA_SHELL_URL" "$CAELESTIA_SHELL_REF") \
-                || die "Can't resolve Caelestia shell $CAELESTIA_SHELL_REF"
+            commit=$(resolve_ref "$CAELESTIA_SHELL_URL" "$CAELESTIA_SHELL_REF") ||
+                die "Can't resolve Caelestia shell $CAELESTIA_SHELL_REF"
         fi
         sync_shell_qml "$commit"
     fi
@@ -592,7 +601,7 @@ patch_caelestia_qml() {
     git checkout -- . 2>/dev/null || warn "Could not git-reset $dir; patches may stack."
 
     # 'char' is reserved in Ubuntu's QML parser.
-    find . -type f -name "InputField.qml"    -exec sed -i 's/\bchar\b/charItem/g' {} +
+    find . -type f -name "InputField.qml" -exec sed -i 's/\bchar\b/charItem/g' {} +
     # DoubleSpinBox / decimals are newer than Ubuntu's QtQuick.Controls.
     find . -type f -name "StyledSpinBox.qml" -exec sed -i 's/DoubleSpinBox/SpinBox/g' {} +
     find . -type f -name "StyledSpinBox.qml" -exec sed -i '/decimals:/s/^/\/\//' {} +
@@ -626,7 +635,7 @@ PY
     # autologin + lock-on-startup doesn't mean typing the password twice.
     local pam_file="assets/pam.d/passwd"
     if [[ -f "$pam_file" ]] && ! grep -q pam_gnome_keyring "$pam_file"; then
-        echo 'auth    optional    pam_gnome_keyring.so' >> "$pam_file"
+        echo 'auth    optional    pam_gnome_keyring.so' >>"$pam_file"
         info "lock screen now unlocks the GNOME keyring"
     fi
 
@@ -855,8 +864,11 @@ patch_caelestia_cli() {
     log "Patching Caelestia CLI recorder"
 
     local record_py
-    record_py=$(python3 -c 'import caelestia.subcommands.record as m; print(m.__file__)' 2>/dev/null) \
-        || { warn "Caelestia CLI not importable; skipping recorder patch."; return 0; }
+    record_py=$(python3 -c 'import caelestia.subcommands.record as m; print(m.__file__)' 2>/dev/null) ||
+        {
+            warn "Caelestia CLI not importable; skipping recorder patch."
+            return 0
+        }
 
     # Installed system-wide by build_caelestia_ecosystem, so usually root-owned.
     local SUDO=""
@@ -1019,7 +1031,7 @@ install_user_units() {
         info "hyprland-session.target provided by Hyprland"
     else
         info "hyprland-session.target missing; installing a local fallback"
-        cat > "$unit_dir/hyprland-session.target" <<'EOF'
+        cat >"$unit_dir/hyprland-session.target" <<'EOF'
 [Unit]
 Description=Hyprland session
 Documentation=man:systemd.special(7)
@@ -1039,8 +1051,8 @@ EOF
     systemctl --user daemon-reload
 
     # --- Sunshine -----------------------------------------------------------
-    if systemctl --user list-unit-files sunshine.service >/dev/null 2>&1 \
-       && systemctl --user cat sunshine.service >/dev/null 2>&1; then
+    if systemctl --user list-unit-files sunshine.service >/dev/null 2>&1 &&
+        systemctl --user cat sunshine.service >/dev/null 2>&1; then
         systemctl --user enable sunshine.service
         info "sunshine.service enabled (starts with graphical-session.target)"
     else
@@ -1070,7 +1082,7 @@ configure_portals() {
     mkdir -p "$HOME/.config/xdg-desktop-portal"
     # hyprland first for screen capture, gtk as fallback for file pickers.
     printf '[preferred]\ndefault=hyprland;gtk\n' \
-        > "$HOME/.config/xdg-desktop-portal/hyprland-portals.conf"
+        >"$HOME/.config/xdg-desktop-portal/hyprland-portals.conf"
 }
 
 # ---------------------------------------------------------------------------
@@ -1096,7 +1108,7 @@ configure_sunshine() {
     if grep -q '^capture *=' "$conf"; then
         sed -i 's/^capture *=.*/capture = wlr/' "$conf"
     else
-        echo "capture = wlr" >> "$conf"
+        echo "capture = wlr" >>"$conf"
     fi
     info "capture = wlr set in $conf"
 }
@@ -1140,8 +1152,8 @@ configure_desktop() {
         sed -i '/^gtk-application-prefer-dark-theme=/d' "$HOME/.config/gtk-4.0/settings.ini"
     fi
 
-    gsettings set org.gnome.desktop.interface gtk-theme 'adw-gtk3-dark' \
-        || warn "gsettings unavailable (not in a session?); Caelestia will set the theme on its next scheme change"
+    gsettings set org.gnome.desktop.interface gtk-theme 'adw-gtk3-dark' ||
+        warn "gsettings unavailable (not in a session?); Caelestia will set the theme on its next scheme change"
 
     # --- Thunar as the file manager ----------------------------------------------
     # Folders opened via xdg-open follow the inode/directory default. Apps like
@@ -1149,12 +1161,12 @@ configure_desktop() {
     # which Nautilus claims by default; a user-level service file points D-Bus at
     # Thunar instead. start.sh also starts Thunar's daemon so it owns the name
     # before anything else can.
-    xdg-mime default thunar.desktop inode/directory \
-        || warn "xdg-mime failed; set Thunar as the folder handler by hand"
+    xdg-mime default thunar.desktop inode/directory ||
+        warn "xdg-mime failed; set Thunar as the folder handler by hand"
 
     local dbus_dir="$HOME/.local/share/dbus-1/services"
     mkdir -p "$dbus_dir"
-    cat > "$dbus_dir/org.freedesktop.FileManager1.service" <<EOF
+    cat >"$dbus_dir/org.freedesktop.FileManager1.service" <<EOF
 [D-BUS Service]
 Name=org.freedesktop.FileManager1
 Exec=$(command -v thunar || echo /usr/bin/thunar) --daemon
@@ -1166,7 +1178,7 @@ EOF
     # rewrites gtk.css; the next folder open starts a fresh one.
     local unit_dir="$HOME/.config/systemd/user"
     mkdir -p "$unit_dir"
-    cat > "$unit_dir/thunar-theme-reload.path" <<'EOF'
+    cat >"$unit_dir/thunar-theme-reload.path" <<'EOF'
 [Unit]
 Description=Watch GTK colours for Caelestia theme changes
 
@@ -1176,7 +1188,7 @@ PathChanged=%h/.config/gtk-3.0/gtk.css
 [Install]
 WantedBy=default.target
 EOF
-    cat > "$unit_dir/thunar-theme-reload.service" <<'EOF'
+    cat >"$unit_dir/thunar-theme-reload.service" <<'EOF'
 [Unit]
 Description=Restart Thunar so it picks up new GTK colours
 
@@ -1192,8 +1204,8 @@ EOF
     # xdg-mime instead of xdg-settings: xdg-settings shells out to coreutils,
     # which get SIGSYS'd when it runs inside Chrome's sandbox (uutils + seccomp).
     if [[ -f /usr/share/applications/google-chrome.desktop ]]; then
-        xdg-mime default google-chrome.desktop x-scheme-handler/http x-scheme-handler/https text/html \
-            || warn "xdg-mime failed; set the default browser by hand"
+        xdg-mime default google-chrome.desktop x-scheme-handler/http x-scheme-handler/https text/html ||
+            warn "xdg-mime failed; set the default browser by hand"
         info "Chrome set as default browser"
     else
         info "Chrome not installed; leaving the default browser alone"
@@ -1210,7 +1222,7 @@ EOF
         sudo mkdir -p /etc/opt/chrome/policies/managed
         local rule_tmp
         rule_tmp=$(mktemp)
-        echo "$USER ALL=(root) NOPASSWD: /usr/bin/tee /etc/opt/chrome/policies/managed/caelestia.json" > "$rule_tmp"
+        echo "$USER ALL=(root) NOPASSWD: /usr/bin/tee /etc/opt/chrome/policies/managed/caelestia.json" >"$rule_tmp"
         if sudo visudo -cf "$rule_tmp" >/dev/null; then
             sudo install -m 0440 -o root -g root "$rule_tmp" /etc/sudoers.d/caelestia-chrome
             info "Chrome theme colour can now follow the wallpaper"
@@ -1226,7 +1238,7 @@ EOF
     # game's seccomp filter -- the reason xdg-open fell back to Firefox.
     mkdir -p "$HOME/.local/bin"
     printf '%s\n' '#!/bin/sh' 'exec systemd-run --user --quiet google-chrome "$@"' \
-        > "$HOME/.local/bin/wine-open-url"
+        >"$HOME/.local/bin/wine-open-url"
     chmod +x "$HOME/.local/bin/wine-open-url"
     info "installed ~/.local/bin/wine-open-url"
 }
@@ -1335,7 +1347,7 @@ check_nvidia_modules() {
 
 # Tag of a GitHub repo's latest release. Follows the /releases/latest
 # redirect, so no API token or rate limit is involved.
-latest_github_release() {  # OWNER/REPO
+latest_github_release() { # OWNER/REPO
     local url
     url=$(curl -fsSL -o /dev/null -w '%{url_effective}' --proto '=https' --tlsv1.2 \
         "https://github.com/$1/releases/latest") || return 1
@@ -1344,10 +1356,10 @@ latest_github_release() {  # OWNER/REPO
 }
 
 # The SHA-256 GitHub publishes for a release asset; empty if unavailable.
-github_asset_sha256() {  # OWNER/REPO TAG ASSET
+github_asset_sha256() { # OWNER/REPO TAG ASSET
     curl -fsSL --proto '=https' --tlsv1.2 \
-        "https://api.github.com/repos/$1/releases/tags/$2" 2>/dev/null \
-        | ASSET="$3" python3 -c '
+        "https://api.github.com/repos/$1/releases/tags/$2" 2>/dev/null |
+        ASSET="$3" python3 -c '
 import json, os, sys
 for a in json.load(sys.stdin).get("assets", []):
     d = str(a.get("digest") or "")
@@ -1358,16 +1370,22 @@ for a in json.load(sys.stdin).get("assets", []):
 
 # The GTK theme Caelestia's colours are written for. Unpacked to a scratch
 # directory first, so a bad download never removes the working theme.
-install_adw_gtk3() {  # TAG
+install_adw_gtk3() { # TAG
     local tag=$1 themes="$HOME/.local/share/themes" tmp d
     tmp=$(mktemp -d)
     curl -fsSL --proto '=https' --tlsv1.2 -o "$tmp/adw.tar.xz" \
-        "https://github.com/lassekongo83/adw-gtk3/releases/download/${tag}/adw-gtk3${tag}.tar.xz" \
-        || { rm -rf "$tmp"; die "Could not download adw-gtk3 $tag"; }
+        "https://github.com/lassekongo83/adw-gtk3/releases/download/${tag}/adw-gtk3${tag}.tar.xz" ||
+        {
+            rm -rf "$tmp"
+            die "Could not download adw-gtk3 $tag"
+        }
     mkdir "$tmp/x"
     tar xJf "$tmp/adw.tar.xz" -C "$tmp/x"
-    [[ -d "$tmp/x/adw-gtk3-dark" ]] \
-        || { rm -rf "$tmp"; die "adw-gtk3 $tag archive doesn't contain adw-gtk3-dark"; }
+    [[ -d "$tmp/x/adw-gtk3-dark" ]] ||
+        {
+            rm -rf "$tmp"
+            die "adw-gtk3 $tag archive doesn't contain adw-gtk3-dark"
+        }
     mkdir -p "$themes"
     for d in "$tmp/x"/*/; do
         d=${d%/}
@@ -1380,7 +1398,7 @@ install_adw_gtk3() {  # TAG
 }
 
 # Sunshine comes from its GitHub release .deb, which never updates itself.
-update_sunshine() {  # TAG
+update_sunshine() { # TAG
     local tag=$1 os arch deb tmp want sum
     log "Updating Sunshine to $tag"
     os=$(. /etc/os-release && printf '%s' "$VERSION_ID")
@@ -1388,19 +1406,28 @@ update_sunshine() {  # TAG
     deb="sunshine_${tag#v}-1+ubuntu${os}_${arch}.deb"
     tmp=$(mktemp -d)
     curl -fsSL --proto '=https' --tlsv1.2 -o "$tmp/$deb" \
-        "https://github.com/LizardByte/Sunshine/releases/download/${tag}/${deb}" \
-        || { rm -rf "$tmp"; die "Sunshine $tag has no $deb"; }
+        "https://github.com/LizardByte/Sunshine/releases/download/${tag}/${deb}" ||
+        {
+            rm -rf "$tmp"
+            die "Sunshine $tag has no $deb"
+        }
 
     want=$(github_asset_sha256 LizardByte/Sunshine "$tag" "$deb")
     if [[ -n "$want" ]]; then
         sum=$(sha256sum "$tmp/$deb" | cut -d ' ' -f 1)
-        [[ "$sum" == "$want" ]] || { rm -rf "$tmp"; die "Checksum mismatch for $deb"; }
+        [[ "$sum" == "$want" ]] || {
+            rm -rf "$tmp"
+            die "Checksum mismatch for $deb"
+        }
         info "checksum matches GitHub's"
     else
         warn "GitHub gave no checksum for $deb; installing on the HTTPS download alone"
     fi
-    [[ "$(dpkg-deb -f "$tmp/$deb" Package)" == sunshine ]] \
-        || { rm -rf "$tmp"; die "$deb isn't the sunshine package"; }
+    [[ "$(dpkg-deb -f "$tmp/$deb" Package)" == sunshine ]] ||
+        {
+            rm -rf "$tmp"
+            die "$deb isn't the sunshine package"
+        }
 
     # Readable by apt's sandbox user, which avoids an "unsandboxed" notice.
     chmod 755 "$tmp"
@@ -1436,7 +1463,11 @@ update_sunshine() {  # TAG
 
 UPDATE_COMPONENTS=(system hyprland quickshell libcava caelestia cli gsr sunshine theme)
 
-_in() { local x=$1; shift; [[ " $* " == *" $x "* ]]; }
+_in() {
+    local x=$1
+    shift
+    [[ " $* " == *" $x "* ]]
+}
 
 stop_shell() {
     [[ "$SHELL_STOPPED" == 1 ]] && return 0
@@ -1469,12 +1500,12 @@ run_step() {
 update() {
     local c
     for c in "$@"; do
-        _in "$c" "${UPDATE_COMPONENTS[@]}" \
-            || die "Unknown component '$c'. Choose from: ${UPDATE_COMPONENTS[*]}"
+        _in "$c" "${UPDATE_COMPONENTS[@]}" ||
+            die "Unknown component '$c'. Choose from: ${UPDATE_COMPONENTS[*]}"
     done
     local explicit=$#
     local -a want=("$@")
-    (( explicit )) || want=("${UPDATE_COMPONENTS[@]}")
+    ((explicit)) || want=("${UPDATE_COMPONENTS[@]}")
 
     preflight
     mkdir -p "$STATE_DIR"
@@ -1503,13 +1534,13 @@ update() {
     fi
 
     if _in hyprland "${want[@]}"; then
-        have=$(hyprctl version -j 2>/dev/null \
-            | python3 -c 'import json, sys; print(json.load(sys.stdin).get("tag", ""))' 2>/dev/null || true)
+        have=$(hyprctl version -j 2>/dev/null |
+            python3 -c 'import json, sys; print(json.load(sys.stdin).get("tag", ""))' 2>/dev/null || true)
         have=${have%%-*}
         latest=$(latest_tag https://github.com/hyprwm/Hyprland.git)
         if [[ -z "$latest" ]]; then
             plan+=("Hyprland|can't reach GitHub; skipped")
-        elif (( explicit )) || [[ "$have" != "$latest" ]]; then
+        elif ((explicit)) || [[ "$have" != "$latest" ]]; then
             todo+=(hyprland)
             plan+=("Hyprland|${have:-unknown} -> $latest (with its libraries and portal, via hyprbuntu)")
         else
@@ -1517,7 +1548,7 @@ update() {
         fi
     fi
 
-    _plan_git() {  # COMPONENT LABEL URL REF STATE-KEY
+    _plan_git() { # COMPONENT LABEL URL REF STATE-KEY
         local cur target
         cur=$(state_get "$5")
         if ! target=$(resolve_ref "$3" "$4"); then
@@ -1551,8 +1582,8 @@ update() {
     if _in libcava "${todo[@]}" && ! _in caelestia "${todo[@]}"; then
         new[caelestia]=$(state_get caelestia-shell)
         if [[ -z "${new[caelestia]}" ]]; then
-            new[caelestia]=$(resolve_ref "$CAELESTIA_SHELL_URL" "$CAELESTIA_SHELL_REF") \
-                || die "Can't resolve Caelestia shell $CAELESTIA_SHELL_REF"
+            new[caelestia]=$(resolve_ref "$CAELESTIA_SHELL_URL" "$CAELESTIA_SHELL_REF") ||
+                die "Can't resolve Caelestia shell $CAELESTIA_SHELL_REF"
         fi
         todo+=(caelestia)
         plan+=("Caelestia shell|rebuilt against the new libcava")
@@ -1596,7 +1627,7 @@ update() {
     done
     echo
 
-    if (( ${#todo[@]} == 0 )); then
+    if ((${#todo[@]} == 0)); then
         log "Everything is up to date"
         return 0
     fi
@@ -1630,7 +1661,7 @@ update() {
         if _in "$c" "${todo[@]}"; then builds+=("$c"); fi
     done
 
-    if (( ${#builds[@]} )); then
+    if ((${#builds[@]})); then
         command -v meson >/dev/null || sudo apt-get install -y meson
         BUILD_DIR=$(mktemp -d -p "$HOME" .hypr-update.XXXXXX)
         local src="$BUILD_DIR" qml="$HOME/.config/quickshell/caelestia"
@@ -1702,8 +1733,8 @@ update() {
     fi
 
     log "Update finished"
-    if (( ${#ok[@]} )); then info "Updated: ${ok[*]}"; fi
-    if (( ${#failed[@]} )); then
+    if ((${#ok[@]})); then info "Updated: ${ok[*]}"; fi
+    if ((${#failed[@]})); then
         warn "Failed: ${failed[*]}. Rerun './hypr-setup.sh update' to retry; details in $LOG_FILE"
     fi
     if _in system "${ok[@]}" || _in hyprland "${ok[@]}"; then
@@ -1762,21 +1793,21 @@ EOF
 
 main() {
     case "${1:-}" in
-        update)
-            shift
-            update "$@"
-            return 0
-            ;;
-        --step)  # internal: one step with arguments, started by run_step()
-            shift
-            declare -F "${1:-}" >/dev/null || die "Unknown step: ${1:-}"
-            "$@"
-            return 0
-            ;;
+    update)
+        shift
+        update "$@"
+        return 0
+        ;;
+    --step) # internal: one step with arguments, started by run_step()
+        shift
+        declare -F "${1:-}" >/dev/null || die "Unknown step: ${1:-}"
+        "$@"
+        return 0
+        ;;
     esac
 
     # Run individual steps by name, e.g. ./hypr-setup.sh patch_caelestia_qml
-    if (( $# )); then
+    if (($#)); then
         local step
         for step in "$@"; do
             declare -F "$step" >/dev/null || die "Unknown step: $step"
@@ -1797,7 +1828,7 @@ main() {
     else
         build_portal
     fi
-    if [[ "$SKIP_GSR"       == "1" ]]; then info "Skipping gpu-screen-recorder"; else build_gpu_screen_recorder; fi
+    if [[ "$SKIP_GSR" == "1" ]]; then info "Skipping gpu-screen-recorder"; else build_gpu_screen_recorder; fi
 
     patch_caelestia_qml
     patch_caelestia_cli
@@ -1807,7 +1838,7 @@ main() {
     configure_portals
     configure_sunshine
 
-    if [[ "$SKIP_DESKTOP"      == "1" ]]; then info "Skipping desktop integration"; else configure_desktop; fi
+    if [[ "$SKIP_DESKTOP" == "1" ]]; then info "Skipping desktop integration"; else configure_desktop; fi
     if [[ "$SKIP_SYSTEM_FIXES" == "1" ]]; then info "Skipping system fixes"; else apply_system_fixes; fi
 
     check_nvidia_modules
