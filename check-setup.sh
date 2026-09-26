@@ -85,6 +85,8 @@ fi
 echo "Caelestia shell patches (hypr-setup.sh patch_caelestia_qml)"
 check "monitor lookup is reactive (blurry bar / dead edges fix)" \
     has "$QS/services/Hypr.qml" "Reactive lookup"
+check "shell has the reloadShell command" has "$QS/services/Hypr.qml" "function reloadShell"
+check "stop_vd.sh reloads the shell after a stream" has "$HOME/.config/sunshine/stop_vd.sh" "reloadShell"
 check "lock video present" has "$QS/modules/lock/LockSurface.qml" "id: lockVideo"
 check "lock video audio follows the default output (stream audio fix)" \
     has "$QS/modules/lock/LockSurface.qml" "mediaDevices.defaultAudioOutput"
