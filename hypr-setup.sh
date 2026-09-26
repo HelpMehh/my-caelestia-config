@@ -32,12 +32,12 @@ LOCK_VIDEO="${LOCK_VIDEO:-$HOME/Wallpaper/lockscreen.mp4}"
 LOCK_VIDEO_SCREENS="${LOCK_VIDEO_SCREENS:-DP-2 sunshine_vd}"
 # Audio: "once" plays it on the first pass and loops silently after, so an idle
 # lock doesn't repeat it for hours; "always" plays it every loop; "off" mutes it.
-LOCK_VIDEO_AUDIO="${LOCK_VIDEO_AUDIO:-once}"
+LOCK_VIDEO_AUDIO="${LOCK_VIDEO_AUDIO:-always}"
 # How opaque the lock screen's panel and its cards are, 0-1. Lower lets more of
 # the video show through; 1 is Caelestia's normal look. Only the backgrounds
 # fade, not the text. Try another value without a full run:
 #   LOCK_PANEL_OPACITY=0.5 ./hypr-setup.sh patch_caelestia_qml
-LOCK_PANEL_OPACITY="${LOCK_PANEL_OPACITY:-0.7}"
+LOCK_PANEL_OPACITY="${LOCK_PANEL_OPACITY:-0.2}"
 
 SKIP_HYPRBUNTU="${SKIP_HYPRBUNTU:-0}"
 SKIP_CAELESTIA="${SKIP_CAELESTIA:-0}"
@@ -60,10 +60,13 @@ exec > >(tee -a "$LOG_FILE") 2>&1
 BUILD_DIR=""
 SUDO_KEEPALIVE_PID=""
 
-log()   { printf '\n\033[1;34m==>\033[0m %s\n' "$*"; }
-info()  { printf '    %s\n' "$*"; }
-warn()  { printf '\033[1;33m[warn]\033[0m %s\n' "$*" >&2; }
-die()   { printf '\033[1;31m[fail]\033[0m %s\n' "$*" >&2; exit 1; }
+log() { printf '\n\033[1;34m==>\033[0m %s\n' "$*"; }
+info() { printf '    %s\n' "$*"; }
+warn() { printf '\033[1;33m[warn]\033[0m %s\n' "$*" >&2; }
+die() {
+    printf '\033[1;31m[fail]\033[0m %s\n' "$*" >&2
+    exit 1
+}
 
 on_error() {
     local line=$1
@@ -109,9 +112,9 @@ preflight() {
     # (hyprbuntu from GitLab, sources from GitHub, units and wrappers inline),
     # so these two are the only prerequisites. Install them on a fresh system.
     local missing=()
-    command -v git  >/dev/null || missing+=(git)
+    command -v git >/dev/null || missing+=(git)
     command -v curl >/dev/null || missing+=(curl)
-    if (( ${#missing[@]} )); then
+    if ((${#missing[@]})); then
         info "Installing prerequisites: ${missing[*]}"
         sudo apt-get update
         sudo apt-get install -y "${missing[@]}" ca-certificates
@@ -218,8 +221,8 @@ run_hyprbuntu() {
     # chmod +x and execute.
     curl -fsSL --proto '=https' --tlsv1.2 \
         -o "$script" \
-        "https://gitlab.com/kralos/hyprbuntu/-/raw/main/setup-hyprbuntu.sh" \
-        || die "Could not download setup-hyprbuntu.sh"
+        "https://gitlab.com/kralos/hyprbuntu/-/raw/main/setup-hyprbuntu.sh" ||
+        die "Could not download setup-hyprbuntu.sh"
 
     [[ -s "$script" ]] || die "Downloaded setup-hyprbuntu.sh is empty."
 
@@ -335,8 +338,8 @@ build_caelestia_ecosystem() {
     # in restore_personal_config(). Written unconditionally so a fresh machine
     # has valid Lua even if the repo restore is skipped.
     mkdir -p "$HOME/.config/caelestia"
-    [[ -f "$HOME/.config/caelestia/hypr-vars.lua" ]] || echo "return {}" > "$HOME/.config/caelestia/hypr-vars.lua"
-    [[ -f "$HOME/.config/caelestia/hypr-user.lua" ]] || echo ""            > "$HOME/.config/caelestia/hypr-user.lua"
+    [[ -f "$HOME/.config/caelestia/hypr-vars.lua" ]] || echo "return {}" >"$HOME/.config/caelestia/hypr-vars.lua"
+    [[ -f "$HOME/.config/caelestia/hypr-user.lua" ]] || echo "" >"$HOME/.config/caelestia/hypr-user.lua"
 
     caelestia install || warn "caelestia install returned non-zero; continuing."
 
@@ -375,7 +378,7 @@ build_gpu_screen_recorder() {
     local dir
     dir=$(mktemp -d)
     git clone --depth 1 https://repo.dec05eba.com/gpu-screen-recorder "$dir/gsr"
-    ( cd "$dir/gsr" && sudo ./install.sh )
+    (cd "$dir/gsr" && sudo ./install.sh)
     rm -rf "$dir"
 }
 
@@ -403,7 +406,7 @@ patch_caelestia_qml() {
     git checkout -- . 2>/dev/null || warn "Could not git-reset $dir; patches may stack."
 
     # 'char' is reserved in Ubuntu's QML parser.
-    find . -type f -name "InputField.qml"    -exec sed -i 's/\bchar\b/charItem/g' {} +
+    find . -type f -name "InputField.qml" -exec sed -i 's/\bchar\b/charItem/g' {} +
     # DoubleSpinBox / decimals are newer than Ubuntu's QtQuick.Controls.
     find . -type f -name "StyledSpinBox.qml" -exec sed -i 's/DoubleSpinBox/SpinBox/g' {} +
     find . -type f -name "StyledSpinBox.qml" -exec sed -i '/decimals:/s/^/\/\//' {} +
@@ -437,7 +440,7 @@ PY
     # autologin + lock-on-startup doesn't mean typing the password twice.
     local pam_file="assets/pam.d/passwd"
     if [[ -f "$pam_file" ]] && ! grep -q pam_gnome_keyring "$pam_file"; then
-        echo 'auth    optional    pam_gnome_keyring.so' >> "$pam_file"
+        echo 'auth    optional    pam_gnome_keyring.so' >>"$pam_file"
         info "lock screen now unlocks the GNOME keyring"
     fi
 
@@ -666,8 +669,11 @@ patch_caelestia_cli() {
     log "Patching Caelestia CLI recorder"
 
     local record_py
-    record_py=$(python3 -c 'import caelestia.subcommands.record as m; print(m.__file__)' 2>/dev/null) \
-        || { warn "Caelestia CLI not importable; skipping recorder patch."; return 0; }
+    record_py=$(python3 -c 'import caelestia.subcommands.record as m; print(m.__file__)' 2>/dev/null) ||
+        {
+            warn "Caelestia CLI not importable; skipping recorder patch."
+            return 0
+        }
 
     # Installed system-wide by build_caelestia_ecosystem, so usually root-owned.
     local SUDO=""
@@ -830,7 +836,7 @@ install_user_units() {
         info "hyprland-session.target provided by Hyprland"
     else
         info "hyprland-session.target missing; installing a local fallback"
-        cat > "$unit_dir/hyprland-session.target" <<'EOF'
+        cat >"$unit_dir/hyprland-session.target" <<'EOF'
 [Unit]
 Description=Hyprland session
 Documentation=man:systemd.special(7)
@@ -850,8 +856,8 @@ EOF
     systemctl --user daemon-reload
 
     # --- Sunshine -----------------------------------------------------------
-    if systemctl --user list-unit-files sunshine.service >/dev/null 2>&1 \
-       && systemctl --user cat sunshine.service >/dev/null 2>&1; then
+    if systemctl --user list-unit-files sunshine.service >/dev/null 2>&1 &&
+        systemctl --user cat sunshine.service >/dev/null 2>&1; then
         systemctl --user enable sunshine.service
         info "sunshine.service enabled (starts with graphical-session.target)"
     else
@@ -881,7 +887,7 @@ configure_portals() {
     mkdir -p "$HOME/.config/xdg-desktop-portal"
     # hyprland first for screen capture, gtk as fallback for file pickers.
     printf '[preferred]\ndefault=hyprland;gtk\n' \
-        > "$HOME/.config/xdg-desktop-portal/hyprland-portals.conf"
+        >"$HOME/.config/xdg-desktop-portal/hyprland-portals.conf"
 }
 
 # ---------------------------------------------------------------------------
@@ -907,7 +913,7 @@ configure_sunshine() {
     if grep -q '^capture *=' "$conf"; then
         sed -i 's/^capture *=.*/capture = wlr/' "$conf"
     else
-        echo "capture = wlr" >> "$conf"
+        echo "capture = wlr" >>"$conf"
     fi
     info "capture = wlr set in $conf"
 }
@@ -931,8 +937,8 @@ configure_desktop() {
         local tmp
         tmp=$(mktemp -d)
         curl -fsSL --proto '=https' --tlsv1.2 -o "$tmp/adw.tar.xz" \
-            "https://github.com/lassekongo83/adw-gtk3/releases/download/${ADW_GTK3_VERSION}/adw-gtk3${ADW_GTK3_VERSION}.tar.xz" \
-            || die "Could not download adw-gtk3 ${ADW_GTK3_VERSION}"
+            "https://github.com/lassekongo83/adw-gtk3/releases/download/${ADW_GTK3_VERSION}/adw-gtk3${ADW_GTK3_VERSION}.tar.xz" ||
+            die "Could not download adw-gtk3 ${ADW_GTK3_VERSION}"
         mkdir -p "$themes"
         tar xJf "$tmp/adw.tar.xz" -C "$themes"
         rm -rf "$tmp"
@@ -961,8 +967,8 @@ configure_desktop() {
         sed -i '/^gtk-application-prefer-dark-theme=/d' "$HOME/.config/gtk-4.0/settings.ini"
     fi
 
-    gsettings set org.gnome.desktop.interface gtk-theme 'adw-gtk3-dark' \
-        || warn "gsettings unavailable (not in a session?); Caelestia will set the theme on its next scheme change"
+    gsettings set org.gnome.desktop.interface gtk-theme 'adw-gtk3-dark' ||
+        warn "gsettings unavailable (not in a session?); Caelestia will set the theme on its next scheme change"
 
     # --- Thunar as the file manager ----------------------------------------------
     # Folders opened via xdg-open follow the inode/directory default. Apps like
@@ -970,12 +976,12 @@ configure_desktop() {
     # which Nautilus claims by default; a user-level service file points D-Bus at
     # Thunar instead. start.sh also starts Thunar's daemon so it owns the name
     # before anything else can.
-    xdg-mime default thunar.desktop inode/directory \
-        || warn "xdg-mime failed; set Thunar as the folder handler by hand"
+    xdg-mime default thunar.desktop inode/directory ||
+        warn "xdg-mime failed; set Thunar as the folder handler by hand"
 
     local dbus_dir="$HOME/.local/share/dbus-1/services"
     mkdir -p "$dbus_dir"
-    cat > "$dbus_dir/org.freedesktop.FileManager1.service" <<EOF
+    cat >"$dbus_dir/org.freedesktop.FileManager1.service" <<EOF
 [D-BUS Service]
 Name=org.freedesktop.FileManager1
 Exec=$(command -v thunar || echo /usr/bin/thunar) --daemon
@@ -987,7 +993,7 @@ EOF
     # rewrites gtk.css; the next folder open starts a fresh one.
     local unit_dir="$HOME/.config/systemd/user"
     mkdir -p "$unit_dir"
-    cat > "$unit_dir/thunar-theme-reload.path" <<'EOF'
+    cat >"$unit_dir/thunar-theme-reload.path" <<'EOF'
 [Unit]
 Description=Watch GTK colours for Caelestia theme changes
 
@@ -997,7 +1003,7 @@ PathChanged=%h/.config/gtk-3.0/gtk.css
 [Install]
 WantedBy=default.target
 EOF
-    cat > "$unit_dir/thunar-theme-reload.service" <<'EOF'
+    cat >"$unit_dir/thunar-theme-reload.service" <<'EOF'
 [Unit]
 Description=Restart Thunar so it picks up new GTK colours
 
@@ -1013,8 +1019,8 @@ EOF
     # xdg-mime instead of xdg-settings: xdg-settings shells out to coreutils,
     # which get SIGSYS'd when it runs inside Chrome's sandbox (uutils + seccomp).
     if [[ -f /usr/share/applications/google-chrome.desktop ]]; then
-        xdg-mime default google-chrome.desktop x-scheme-handler/http x-scheme-handler/https text/html \
-            || warn "xdg-mime failed; set the default browser by hand"
+        xdg-mime default google-chrome.desktop x-scheme-handler/http x-scheme-handler/https text/html ||
+            warn "xdg-mime failed; set the default browser by hand"
         info "Chrome set as default browser"
     else
         info "Chrome not installed; leaving the default browser alone"
@@ -1031,7 +1037,7 @@ EOF
         sudo mkdir -p /etc/opt/chrome/policies/managed
         local rule_tmp
         rule_tmp=$(mktemp)
-        echo "$USER ALL=(root) NOPASSWD: /usr/bin/tee /etc/opt/chrome/policies/managed/caelestia.json" > "$rule_tmp"
+        echo "$USER ALL=(root) NOPASSWD: /usr/bin/tee /etc/opt/chrome/policies/managed/caelestia.json" >"$rule_tmp"
         if sudo visudo -cf "$rule_tmp" >/dev/null; then
             sudo install -m 0440 -o root -g root "$rule_tmp" /etc/sudoers.d/caelestia-chrome
             info "Chrome theme colour can now follow the wallpaper"
@@ -1047,7 +1053,7 @@ EOF
     # game's seccomp filter -- the reason xdg-open fell back to Firefox.
     mkdir -p "$HOME/.local/bin"
     printf '%s\n' '#!/bin/sh' 'exec systemd-run --user --quiet google-chrome "$@"' \
-        > "$HOME/.local/bin/wine-open-url"
+        >"$HOME/.local/bin/wine-open-url"
     chmod +x "$HOME/.local/bin/wine-open-url"
     info "installed ~/.local/bin/wine-open-url"
 }
@@ -1197,7 +1203,7 @@ EOF
 
 main() {
     # Run individual steps by name, e.g. ./hypr-setup.sh patch_caelestia_qml
-    if (( $# )); then
+    if (($#)); then
         local step
         for step in "$@"; do
             declare -F "$step" >/dev/null || die "Unknown step: $step"
@@ -1211,8 +1217,8 @@ main() {
 
     if [[ "$SKIP_HYPRBUNTU" == "1" ]]; then info "Skipping hyprbuntu"; else run_hyprbuntu; fi
     if [[ "$SKIP_CAELESTIA" == "1" ]]; then info "Skipping Caelestia build"; else build_caelestia_ecosystem; fi
-    if [[ "$SKIP_PORTAL"    == "1" ]]; then info "Skipping portal build"; else build_portal; fi
-    if [[ "$SKIP_GSR"       == "1" ]]; then info "Skipping gpu-screen-recorder"; else build_gpu_screen_recorder; fi
+    if [[ "$SKIP_PORTAL" == "1" ]]; then info "Skipping portal build"; else build_portal; fi
+    if [[ "$SKIP_GSR" == "1" ]]; then info "Skipping gpu-screen-recorder"; else build_gpu_screen_recorder; fi
 
     patch_caelestia_qml
     patch_caelestia_cli
@@ -1222,7 +1228,7 @@ main() {
     configure_portals
     configure_sunshine
 
-    if [[ "$SKIP_DESKTOP"      == "1" ]]; then info "Skipping desktop integration"; else configure_desktop; fi
+    if [[ "$SKIP_DESKTOP" == "1" ]]; then info "Skipping desktop integration"; else configure_desktop; fi
     if [[ "$SKIP_SYSTEM_FIXES" == "1" ]]; then info "Skipping system fixes"; else apply_system_fixes; fi
 
     check_nvidia_modules
