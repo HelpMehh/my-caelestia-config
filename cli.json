@@ -56,16 +56,16 @@
             }
         },
         "todo": {
-            "google_tasks": {
+            "google_calendar": {
                 "enable": true,
                 "match": [
                     {
-                        "class": "chrome-okhfeehhillipaleckndoboggdkcebmo-Default"
+                        "class": "chrome-kjbdgfilnfhdoflbpgamdcdgpehopbep-Default"
                     }
                 ],
                 "command": [
                     "google-chrome",
-                    "--app-id=okhfeehhillipaleckndoboggdkcebmo"
+                    "--app-id=kjbdgfilnfhdoflbpgamdcdgpehopbep"
                 ],
                 "move": true
             }
