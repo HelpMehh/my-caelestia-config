@@ -31,7 +31,7 @@ hl.device({
 hl.workspace_rule({ workspace = "1", monitor = "DP-2" })
 hl.workspace_rule({ workspace = "2", monitor = "HDMI-A-2" })
 hl.workspace_rule({ workspace = "3", monitor = "HDMI-A-1" })
-
+hl.bind("SUPER + B", require("utils.functions").toggle("budget"))
 do
 	local state = (os.getenv("XDG_RUNTIME_DIR") or "") .. "/sunshine_vd.lua"
 	local f = io.open(state, "r")
